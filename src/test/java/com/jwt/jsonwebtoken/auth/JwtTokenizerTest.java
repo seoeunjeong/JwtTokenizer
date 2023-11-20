@@ -1,12 +1,15 @@
 package com.jwt.jsonwebtoken.auth;
 
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -64,5 +67,41 @@ class JwtTokenizerTest {
         System.out.println(refreshToken);
 
         assertThat(refreshToken, notNullValue());
+    }
+
+
+
+    @DisplayName("jws를 검증할때 예외를 던지지 않는다")
+    @Test
+    public void verifySignatureTest(){
+        String accessToken = getAccessToken(Calendar.MINUTE, 10);
+        assertDoesNotThrow(()->jwtTokenizer.verifySignature(accessToken,base64EncodedSecretKey));
+    }
+
+    @DisplayName("jws 검증시 만료된 jwt예외를 던진다")
+    @Test
+    public void verifyExpirationTest() throws InterruptedException{
+        String accessToken = getAccessToken(Calendar.SECOND, 1);
+
+        assertDoesNotThrow(()->jwtTokenizer.verifySignature(accessToken,base64EncodedSecretKey));
+
+        TimeUnit.MILLISECONDS.sleep(1500);
+
+        assertThrows(ExpiredJwtException.class, () -> jwtTokenizer.verifySignature(accessToken, base64EncodedSecretKey));
+    }
+
+
+    private String getAccessToken(int timeUnit, int timeAmount){
+        Map<String,Object> claims =new HashMap<>();
+        claims.put("memberId",1);
+        claims.put("roles",List.of("USER"));
+
+        String subject="test access token";
+        Calendar calendar=Calendar.getInstance();
+        calendar.add(timeUnit,timeAmount);
+        Date expiration = calendar.getTime();
+        String accessToken = jwtTokenizer.generateAccessToken(claims, subject, expiration, base64EncodedSecretKey);
+
+        return accessToken;
     }
 }
